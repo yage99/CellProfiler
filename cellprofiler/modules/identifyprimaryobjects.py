@@ -15,6 +15,7 @@ import cellprofiler.gui.help
 import cellprofiler.gui.help.content
 import cellprofiler.object
 import cellprofiler.setting
+import cellprofiler.module
 import threshold
 import _help
 
@@ -322,7 +323,7 @@ class IdentifyPrimaryObjects(cellprofiler.module.ImageSegmentation):
         super(IdentifyPrimaryObjects, self).__init__()
 
     def volumetric(self):
-        return False
+        return True
 
     def create_settings(self):
         super(IdentifyPrimaryObjects, self).create_settings()
@@ -1013,11 +1014,6 @@ If "*{NO}*" is selected, the following settings are used:
                 size_excluded_labeled_image = numpy.zeros(labeled_image.shape, int)
                 object_count = 0
 
-        # Make an outline image
-        outline_image = centrosome.outline.outline(labeled_image)
-        outline_size_excluded_image = centrosome.outline.outline(size_excluded_labeled_image)
-        outline_border_excluded_image = centrosome.outline.outline(border_excluded_labeled_image)
-
         if self.show_window:
             statistics = workspace.display_data.statistics
             statistics.append(["# of accepted objects",
@@ -1053,10 +1049,6 @@ If "*{NO}*" is selected, the following settings are used:
             workspace.display_data.labeled_image = labeled_image
             workspace.display_data.size_excluded_labels = size_excluded_labeled_image
             workspace.display_data.border_excluded_labels = border_excluded_labeled_image
-
-        # Add image measurements
-        objname = self.y_name.value
-        measurements = workspace.measurements
 
         # Add label matrices to the object set
         objects = cellprofiler.object.Objects()

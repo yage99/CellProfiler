@@ -2225,6 +2225,29 @@ IdentifyPrimaryObjects:[module_num:3|svn_version:\'Unknown\'|variable_revision_n
             labels = workspace.object_set.get_objects(OBJECTS_NAME).segmented
             numpy.testing.assert_array_equal(expected, labels)
 
+    def test_21_test_3d(self):
+        x = cellprofiler.modules.identifyprimaryobjects.IdentifyPrimaryObjects()
+        x.y_name.value = "my_object"
+        x.x_name.value = "my_image"
+        x.threshold.threshold_range.min = .1
+        x.threshold.threshold_range.max = 1
+        x.watershed_method.value = cellprofiler.modules.identifyprimaryobjects.WA_INTENSITY
+        x.unclump_method.value = cellprofiler.modules.identifyprimaryobjects.UN_INTENSITY
+        img = numpy.zeros((10, 25, 25))
+        image = cellprofiler.image.Image(img)
+        image_set_list = cellprofiler.image.ImageSetList()
+        image_set = image_set_list.get_image_set(0)
+        image_set.providers.append(cellprofiler.image.VanillaImageProvider("my_image", image))
+        object_set = cellprofiler.object.ObjectSet()
+        measurements = cellprofiler.measurement.Measurements()
+        pipeline = cellprofiler.pipeline.Pipeline()
+        x.run(cellprofiler.workspace.Workspace(pipeline, x, image_set, object_set, measurements, None))
+        self.assertEqual(len(object_set.object_names), 1)
+        self.assertTrue("my_object" in object_set.object_names)
+        objects = object_set.get_objects("my_object")
+        segmented = objects.segmented
+        self.assertTrue(numpy.all(segmented == 0))
+
 
 def add_noise(img, fraction):
     '''Add a fractional amount of noise to an image to make it look real'''
