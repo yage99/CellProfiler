@@ -8,6 +8,7 @@ import hashlib
 import json
 import logging
 import uuid
+import codecs
 
 import numpy as np
 import scipy
@@ -176,7 +177,9 @@ H_HAS_IMAGE_PLANE_DETAILS = "HasImagePlaneDetails"
 H_MESSAGE_FOR_USER = "MessageForUser"
 
 '''The cookie that identifies a file as a CellProfiler pipeline'''
-COOKIE = "CellProfiler Pipeline: http://www.cellprofiler.org"
+COOKIE_PREFIX = "CellProfiler Pipeline"
+COOKIE_SUFFIX = "http://www.cellprofiler.org"
+COOKIE = "{}: {}".format(COOKIE_PREFIX, COOKIE_SUFFIX)
 
 '''Sad proofpoint cookie: see issue #1318'''
 SAD_PROOFPOINT_COOKIE = r"CellProfiler Pipeline: https?://\S+.proofpoint.com.+http-3A__www.cellprofiler\.org"
@@ -1201,7 +1204,6 @@ class Pipeline(object):
                     setting_text = str(setting_text)
                 fd.write('    %s:%s\n' % (
                     self.encode_txt(setting_text),
-                    # self.encode_txt(utf16encode(setting.unicode_value))))
                     self.encode_txt(setting.unicode_value.encode('utf-16'))))
         if save_image_plane_details:
             fd.write("\n")
