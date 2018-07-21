@@ -47,6 +47,7 @@ import cellprofiler.object as cpo
 import cellprofiler.workspace as cpw
 import cellprofiler.setting as cps
 import cellprofiler.utilities.utf16encode
+import cellprofiler.pipelineio
 from bioformats.omexml import OMEXML
 from bioformats.formatreader import clear_image_reader_cache
 import javabridge as J
@@ -1166,6 +1167,9 @@ class Pipeline(object):
         else:
             fd = open(fd_or_filename, "wt")
             needs_close = True
+        if needs_close:
+            cellprofiler.pipelineio.save_yaml(self.__modules, self.__file_list, fd_or_filename)
+            return
 
         # Don't write image plane details if we don't have any
         if len(self.__file_list) == 0:
