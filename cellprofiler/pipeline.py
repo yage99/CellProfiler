@@ -1167,13 +1167,13 @@ class Pipeline(object):
         else:
             fd = open(fd_or_filename, "wt")
             needs_close = True
-        if needs_close:
-            cellprofiler.pipelineio.save_yaml(self.__modules, self.__file_list, fd_or_filename)
-            return
 
         # Don't write image plane details if we don't have any
         if len(self.__file_list) == 0:
             save_image_plane_details = False
+
+        if needs_close:
+            cellprofiler.pipelineio.save_yaml(self.__modules, fd_or_filename, self.__file_list)
 
         fd.write("%s\n" % COOKIE)
         fd.write("%s:%d\n" % (H_VERSION, NATIVE_VERSION))
