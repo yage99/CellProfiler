@@ -863,8 +863,35 @@ class Pipeline(object):
         self.caption_for_user = None
         self.message_for_user = None
         module_count = sys.maxint
+        import yaml.scanner
+
+        try:
+            # Awful, awful method we have to use to ensure we're handing this 
+            # function a filename and not an actual file
+            # if hasattr(fd_or_filename, 'name'):
+            #     fd_or_filename.close()
+            #     fd_or_filename = fd_or_filename.name
+            new_modules, volumetric = cellprofiler.pipelineio.load_yaml(fd_or_filename, raise_on_error=raise_on_error)
+            has_image_plane_details = False
+            self.__volumetric = volumetric
+            self.__modules = new_modules
+            self.__settings = [self.capture_module_settings(module)
+                               for module in self.modules(False)]
+            for module in self.modules(False):
+                module.post_pipeline_load(self)
+            self.notify_listeners(PipelineLoadedEvent())
+            self.__undo_stack = []
+            return 
+
+        except yaml.scanner.ScannerError:
+            # This means something went wrong in the parsing, which 
+            # is likely because the file isn't yaml
+            pass
+
+        # Use legacy reading method
         if hasattr(fd_or_filename, 'seek') and hasattr(fd_or_filename, 'read'):
             fd = fd_or_filename
+            fd.seek(0)
         else:
             fd = open(fd_or_filename, 'r')
 
@@ -1037,6 +1064,7 @@ class Pipeline(object):
                 # make batch_state decodable from text pipelines
                 # NOTE, MAGIC HERE: These variables are **necessary**, even though they
                 # aren't used anywhere obvious. Removing them **will** break these unit tests.
+                # After further investigation, this has to do with the `eval` call several lines below.
                 array = np.array
                 uint8 = np.uint8
                 for a in attribute_strings:
