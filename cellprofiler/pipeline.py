@@ -1202,6 +1202,7 @@ class Pipeline(object):
 
         if needs_close:
             cellprofiler.pipelineio.save_yaml(self.__modules, fd_or_filename, self.__file_list)
+            return
 
         fd.write("%s\n" % COOKIE)
         fd.write("%s:%d\n" % (H_VERSION, NATIVE_VERSION))

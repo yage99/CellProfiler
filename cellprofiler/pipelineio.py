@@ -5,7 +5,6 @@ import yaml
 import textwrap
 import logging
 import distutils.version
-import collections
 import cellprofiler
 import cellprofiler.module
 import cellprofiler.preferences
@@ -14,21 +13,16 @@ import cellprofiler.preferences
 log = logging.getLogger(__name__)
 
 
+H_HEADER = 'Header'
 H_VERSION_LEGACY = 'Version'
 H_PIPELINE_VERSION = 'PipelineVersion'
 H_CP_VERSION = 'CellProfilerVersion'
 
 # The current pipeline file format version
-NATIVE_VERSION = 5
+CURRENT_PIPELINE_VERSION = 5
 
 # The number of modules in the pipeline
 H_MODULE_COUNT = "ModuleCount"
-
-# Indicates whether the pipeline has an image plane details section
-H_HAS_IMAGE_PLANE_DETAILS = "HasImagePlaneDetails"
-
-# A message for a user, to be displayed when pipeline is loaded
-H_MESSAGE_FOR_USER = "MessageForUser"
 
 # The cookie that identifies a file as a CellProfiler pipeline
 COOKIE_PREFIX = "CellProfiler Pipeline"
@@ -39,8 +33,6 @@ H_PIPELINE_DIMENSION = "Volumetric"
 
 # Module list sentinal
 H_MODULE_LIST = "Module List"
-# File list sentinal
-H_FILE_LIST = "File List"
 
 # Private module attributes
 M_PRIVATE_ATTRIBUTES = "Private module attributes"
@@ -60,24 +52,24 @@ class PipelineLoadException(Exception):
 
 # I actually want this to take in a pipeline object, which means that we'll have to have access to
 # the modules list. It seems like this is available in pipeline.modules()
-def save_yaml(modules, filename, file_list, modules_to_save=(), volumetric=False):
-    # We want to preserve ordering
-    pipeline_dict = collections.OrderedDict()
-    pipeline_dict.update({
+def save_yaml(modules, filename, file_list, modules_to_save=None, volumetric=False):
+    pipeline_dict = {
         COOKIE_PREFIX: COOKIE_SUFFIX,
-        H_CP_VERSION: cellprofiler.__version__,
-        H_PIPELINE_VERSION: NATIVE_VERSION,
-        H_PIPELINE_DIMENSION: volumetric,
-        H_MODULE_COUNT: len(modules),
+        H_HEADER: {
+            H_CP_VERSION: cellprofiler.__version__,
+            H_PIPELINE_VERSION: CURRENT_PIPELINE_VERSION,
+            H_PIPELINE_DIMENSION: volumetric,
+            H_MODULE_COUNT: len(modules)
+        },
         H_MODULE_LIST: []
-    })
+    }
 
     attributes = (M_MODULE_NUMBER, M_SVN_VERSION, M_VARIABLE_REVISION,
                   M_SHOW_WINDOW, M_NOTES, M_ENABLED, M_WANTS_PAUSE)
 
     # For now, I'm going to try and get feature parity with the savetxt function
     for module in modules:
-        if module.module_num not in modules_to_save:
+        if modules_to_save is not None and module.module_num not in modules_to_save:
             continue
 
         # Private module attributes should be at the end
@@ -99,9 +91,7 @@ def save_yaml(modules, filename, file_list, modules_to_save=(), volumetric=False
         # Use safe_dump here because we don't want yaml putting in all these
         # !!python/unicode imperatives all over the place. Additionally, this makes
         # it significantly more readable.
-        # TODO: This doesn't preserve ordering...why?
-        # TODO: It looks like it's actually alphabetic ordering
-        out_file.write(yaml.safe_dump(pipeline_dict))
+        out_file.write(yaml.safe_dump(pipeline_dict, default_flow_style=False))
 
 
 # TODO: I would actually like this to return a pipeline object that has everything set up
@@ -124,21 +114,23 @@ def load_yaml(fd_or_filename, raise_on_error=False, notify_fn=lambda x: None):
     volumetric = False
 
     try:
+        # Extract the header
+        header = pipeline_dict[H_HEADER]
         # Check pipeline file version
-        pipeline_version = int(pipeline_dict[H_PIPELINE_VERSION])
+        pipeline_version = int(header[H_PIPELINE_VERSION])
 
         # From the __future__
-        if pipeline_version > NATIVE_VERSION:
+        if pipeline_version > CURRENT_PIPELINE_VERSION:
             raise PipelineLoadException(textwrap.dedent("""
                 Pipeline file version is {}.
                 CellProfiler can only read version {} or less.
                 Please upgrade to the latest version of CellProfiler in order to use this pipeline.
-            """.format(pipeline_version, NATIVE_VERSION)
+            """.format(pipeline_version, CURRENT_PIPELINE_VERSION)
             ))
         # Anything that needs to be done for previous versions can go here
 
         # Compare the version of cellprofiler that was used to save the pipeline
-        cp_version = distutils.version.StrictVersion(pipeline_dict[H_CP_VERSION])
+        cp_version = distutils.version.StrictVersion(header[H_CP_VERSION])
         if cp_version < distutils.version.StrictVersion(cellprofiler.__version__) and not is_headless:
             log.warning(textwrap.dedent("""
                 Your pipeline was saved using an old version of CellProfiler (version {}). 
@@ -150,7 +142,10 @@ def load_yaml(fd_or_filename, raise_on_error=False, notify_fn=lambda x: None):
             """.format(cp_version)))
 
         # Check the pipeline dimensionality
-        volumetric = pipeline_dict[H_PIPELINE_DIMENSION]
+        volumetric = header[H_PIPELINE_DIMENSION]
+
+        # Get the module count
+        module_count = header[H_MODULE_COUNT]
 
         # Load the modules
         new_modules = []
@@ -192,6 +187,9 @@ def load_yaml(fd_or_filename, raise_on_error=False, notify_fn=lambda x: None):
                     raise
                 log.exception(err)
                 log.warning("Continuing to load the rest of the pipeline")
+
+        if module_count < len(new_modules):
+            log.warning("{} modules could not be imported".format(len(new_modules) - module_count))
 
         return new_modules, volumetric
 
