@@ -8,7 +8,6 @@ import distutils.version
 import collections
 import cellprofiler
 import cellprofiler.module
-import cellprofiler.modules
 import cellprofiler.preferences
 
 
@@ -109,9 +108,11 @@ def save_yaml(modules, filename, file_list, modules_to_save=(), volumetric=False
 # TODO: For now we'll just return the modules, and the volumetric flag
 def load_yaml(fd_or_filename, raise_on_error=False, notify_fn=lambda x: None):
     if not hasattr(fd_or_filename, 'name'):
+        filename = fd_or_filename
         with codecs.open(fd_or_filename, 'r', 'utf-8') as in_file:
             pipe_str = in_file.read()
     else:
+        filename = fd_or_filename.name
         pipe_str = fd_or_filename.read()
     pipeline_dict = yaml.safe_load(pipe_str)
 
@@ -167,7 +168,10 @@ def load_yaml(fd_or_filename, raise_on_error=False, notify_fn=lambda x: None):
 
             try:
                 # Initiate the module
-                module = cellprofiler.modules.instantiate_module(module_name)
+                # This import HAS to be here (and not at the top of the file) because
+                # it may overwrite the other modules that have already been loaded
+                from cellprofiler.modules import instantiate_module
+                module = instantiate_module(module_name)
 
                 # Pop here because we don't want them added to the settings below
                 private_attrs = module_info.pop(M_PRIVATE_ATTRIBUTES)
