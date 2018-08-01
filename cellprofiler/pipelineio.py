@@ -100,14 +100,9 @@ def save_yaml(modules, filename, modules_to_save=None, volumetric=False):
 
 # TODO: I would actually like this to return a pipeline object that has everything set up
 # TODO: For now we'll just return the modules, and the volumetric flag
-def load_yaml(fd_or_filename, raise_on_error=False):
-    if not hasattr(fd_or_filename, 'name'):
-        filename = fd_or_filename
-        with codecs.open(fd_or_filename, 'r', 'utf-8') as in_file:
-            pipe_str = in_file.read()
-    else:
-        filename = fd_or_filename.name
-        pipe_str = fd_or_filename.read()
+def load_yaml(filename, raise_on_error=False):
+    with codecs.open(filename, 'r', 'utf-8') as in_file:
+        pipe_str = in_file.read()
     pipeline_dict = yaml.safe_load(pipe_str)
 
     if COOKIE_PREFIX not in pipeline_dict:

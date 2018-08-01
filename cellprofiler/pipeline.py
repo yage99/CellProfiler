@@ -868,11 +868,11 @@ class Pipeline(object):
         try:
             # Awful, awful method we have to use to ensure we're handing this 
             # function a filename and not an actual file
-            # if hasattr(fd_or_filename, 'name'):
-            #     fd_or_filename.close()
-            #     fd_or_filename = fd_or_filename.name
-            new_modules, volumetric = cellprofiler.pipelineio.load_yaml(fd_or_filename, raise_on_error=raise_on_error)
-            has_image_plane_details = False
+            if hasattr(fd_or_filename, 'name'):
+                filename = fd_or_filename.name
+            else:
+                filename = fd_or_filename
+            new_modules, volumetric = cellprofiler.pipelineio.load_yaml(filename, raise_on_error=raise_on_error)
             self.__volumetric = volumetric
             self.__modules = new_modules
             self.__settings = [self.capture_module_settings(module)
