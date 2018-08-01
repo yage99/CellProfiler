@@ -3,12 +3,10 @@
 from __future__ import with_statement
 
 import bisect
-import csv
 import hashlib
 import json
 import logging
 import uuid
-import codecs
 
 import numpy as np
 import scipy
@@ -26,16 +24,14 @@ import os
 import StringIO  # XXX - replace with cStringIO?
 import sys
 import tempfile
-import traceback
 import datetime
 import timeit
-import traceback
-import threading
 import urlparse
 import urllib
 import urllib2
 import re
 import numpy
+import yaml.scanner
 
 logger = logging.getLogger(__name__)
 pipeline_stats_logger = logging.getLogger("PipelineStatistics")
@@ -48,7 +44,6 @@ import cellprofiler.workspace as cpw
 import cellprofiler.setting as cps
 import cellprofiler.utilities.utf16encode
 import cellprofiler.pipelineio
-from bioformats.omexml import OMEXML
 from bioformats.formatreader import clear_image_reader_cache
 import javabridge as J
 
@@ -863,7 +858,6 @@ class Pipeline(object):
         self.caption_for_user = None
         self.message_for_user = None
         module_count = sys.maxint
-        import yaml.scanner
 
         try:
             # Awful, awful method we have to use to ensure we're handing this 
