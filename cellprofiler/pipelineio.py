@@ -197,8 +197,8 @@ def load_yaml(filename, raise_on_error=False):
                 log.exception(err)
                 log.warning("Continuing to load the rest of the pipeline")
 
-        if module_count < len(new_modules):
-            log.warning("{} modules could not be imported".format(len(new_modules) - module_count))
+        if module_count > len(new_modules):
+            log.warning("{} modules could not be imported".format(module_count - len(new_modules)))
 
         return new_modules, volumetric
 
