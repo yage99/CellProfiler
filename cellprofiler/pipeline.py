@@ -1201,7 +1201,7 @@ class Pipeline(object):
             save_image_plane_details = False
 
         if needs_close:
-            cellprofiler.pipelineio.save_yaml(self.__modules, fd_or_filename, self.__file_list)
+            cellprofiler.pipelineio.save_yaml(self.__modules, fd_or_filename)
             return
 
         fd.write("%s\n" % COOKIE)

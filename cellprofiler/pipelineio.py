@@ -1,5 +1,3 @@
-import re
-import numpy
 import codecs
 import yaml
 import textwrap
@@ -53,7 +51,7 @@ class PipelineLoadException(Exception):
 
 # I actually want this to take in a pipeline object, which means that we'll have to have access to
 # the modules list. It seems like this is available in pipeline.modules()
-def save_yaml(modules, filename, file_list, modules_to_save=None, volumetric=False):
+def save_yaml(modules, filename, modules_to_save=None, volumetric=False):
     # For readability (at least at first), we want the pipelien contents to be in a
     # certain order. Ultimately, everything but the per-module settings (see below)
     # can be in any order - they're accessed as a dictionary so it shouldn't matter.
@@ -102,7 +100,7 @@ def save_yaml(modules, filename, file_list, modules_to_save=None, volumetric=Fal
 
 # TODO: I would actually like this to return a pipeline object that has everything set up
 # TODO: For now we'll just return the modules, and the volumetric flag
-def load_yaml(fd_or_filename, raise_on_error=False, notify_fn=lambda x: None):
+def load_yaml(fd_or_filename, raise_on_error=False):
     if not hasattr(fd_or_filename, 'name'):
         filename = fd_or_filename
         with codecs.open(fd_or_filename, 'r', 'utf-8') as in_file:
