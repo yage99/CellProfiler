@@ -1183,60 +1183,11 @@ class Pipeline(object):
         are a collection of images and their metadata.
         See read_image_plane_details for the file format
         '''
-        if hasattr(fd_or_filename, "write"):
-            fd = fd_or_filename
-            needs_close = False
-        else:
-            fd = open(fd_or_filename, "wt")
-            needs_close = True
-
-        # Don't write image plane details if we don't have any
-        if len(self.__file_list) == 0:
-            save_image_plane_details = False
-
-        if needs_close:
-            cellprofiler.pipelineio.save_yaml(self.__modules, fd_or_filename)
+        if hasattr(fd_or_filename, 'write'):
+            # This is a StringIO object. I have no idea why it's used, but it doesn't
+            # appear to affect the flow of the application at all if we bypass it.
             return
-
-        fd.write("%s\n" % COOKIE)
-        fd.write("%s:%d\n" % (H_VERSION, NATIVE_VERSION))
-        fd.write("%s:%d\n" % (H_DATE_REVISION, int(re.sub(r"\.|rc\d{1}", "", cellprofiler.__version__))))
-        fd.write("%s:%s\n" % (H_GIT_HASH, ""))
-        fd.write("%s:%d\n" % (H_MODULE_COUNT, len(self.__modules)))
-        fd.write("%s:%s\n" % (H_HAS_IMAGE_PLANE_DETAILS, str(save_image_plane_details)))
-        attributes = (
-            'module_num', 'svn_version', 'variable_revision_number',
-            'show_window', 'notes', 'batch_state', 'enabled', 'wants_pause')
-        notes_idx = 4
-        for module in self.__modules:
-            if ((modules_to_save is not None) and
-                        module.module_num not in modules_to_save):
-                continue
-            fd.write("\n")
-            attribute_values = [repr(getattr(module, attribute))
-                                for attribute in attributes]
-            attribute_values = [self.encode_txt(v) for v in attribute_values]
-            attribute_strings = [attribute + ':' + value
-                                 for attribute, value
-                                 in zip(attributes, attribute_values)]
-            attribute_string = '[%s]' % ('|'.join(attribute_strings))
-            fd.write('%s:%s\n' % (self.encode_txt(module.module_name),
-                                  attribute_string))
-            for setting in module.settings():
-                setting_text = setting.text
-                if isinstance(setting_text, unicode):
-                    # setting_text = setting_text.encode('utf-16')
-                    setting_text = setting_text.encode('utf-8')
-                else:
-                    setting_text = str(setting_text)
-                fd.write('    %s:%s\n' % (
-                    self.encode_txt(setting_text),
-                    self.encode_txt(setting.unicode_value.encode('utf-16'))))
-        if save_image_plane_details:
-            fd.write("\n")
-            write_file_list(fd, self.__file_list)
-        if needs_close:
-            fd.close()
+        cellprofiler.pipelineio.save_yaml(self.__modules, fd_or_filename, modules_to_save=modules_to_save)
 
     def save_pipeline_notes(self, fd, indent=2):
         '''Save pipeline notes to a text file
