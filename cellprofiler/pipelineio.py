@@ -95,7 +95,7 @@ def save_yaml(modules, filename, modules_to_save=None, volumetric=False):
         # Use safe_dump here because we don't want yaml putting in all these
         # !!python/unicode imperatives all over the place. Additionally, this makes
         # it significantly more readable.
-        out_file.write(yaml.safe_dump(pipeline_dict, default_flow_style=False))
+        out_file.write(yaml.safe_dump(pipeline_dict, default_flow_style=False, allow_unicode=True).decode('utf-8'))
 
 
 # TODO: I would actually like this to return a pipeline object that has everything set up
