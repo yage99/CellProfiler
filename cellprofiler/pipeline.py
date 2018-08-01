@@ -22,6 +22,7 @@ except:
 
 import os
 import StringIO  # XXX - replace with cStringIO?
+import cStringIO
 import sys
 import tempfile
 import datetime
@@ -862,20 +863,21 @@ class Pipeline(object):
         try:
             # Awful, awful method we have to use to ensure we're handing this 
             # function a filename and not an actual file
-            if hasattr(fd_or_filename, 'name'):
-                filename = fd_or_filename.name
-            else:
-                filename = fd_or_filename
-            new_modules, volumetric = cellprofiler.pipelineio.load_yaml(filename, raise_on_error=raise_on_error)
-            self.__volumetric = volumetric
-            self.__modules = new_modules
-            self.__settings = [self.capture_module_settings(module)
-                               for module in self.modules(False)]
-            for module in self.modules(False):
-                module.post_pipeline_load(self)
-            self.notify_listeners(PipelineLoadedEvent())
-            self.__undo_stack = []
-            return 
+            if type(fd_or_filename) not in [StringIO.StringIO, cStringIO.InputType, cStringIO.OutputType]:
+                if hasattr(fd_or_filename, 'name'):
+                    filename = fd_or_filename.name
+                else:
+                    filename = fd_or_filename
+                new_modules, volumetric = cellprofiler.pipelineio.load_yaml(filename, raise_on_error=raise_on_error)
+                self.__volumetric = volumetric
+                self.__modules = new_modules
+                self.__settings = [self.capture_module_settings(module)
+                                   for module in self.modules(False)]
+                for module in self.modules(False):
+                    module.post_pipeline_load(self)
+                self.notify_listeners(PipelineLoadedEvent())
+                self.__undo_stack = []
+                return
 
         except yaml.scanner.ScannerError:
             # This means something went wrong in the parsing, which 
