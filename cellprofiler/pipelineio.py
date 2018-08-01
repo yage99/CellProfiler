@@ -35,7 +35,8 @@ H_PIPELINE_DIMENSION = "Volumetric"
 H_MODULE_LIST = "Module List"
 
 # Private module attributes
-M_PRIVATE_ATTRIBUTES = "Private module attributes"
+M_PRIVATE_ATTRIBUTES = "Private Module Attributes"
+M_SETTINGS = "Module Settings"
 M_MODULE_NUMBER = 'module_num'
 M_SVN_VERSION = 'svn_version'
 M_VARIABLE_REVISION = 'variable_revision_number'
@@ -53,6 +54,9 @@ class PipelineLoadException(Exception):
 # I actually want this to take in a pipeline object, which means that we'll have to have access to
 # the modules list. It seems like this is available in pipeline.modules()
 def save_yaml(modules, filename, file_list, modules_to_save=None, volumetric=False):
+    # For readability (at least at first), we want the pipelien contents to be in a
+    # certain order. Ultimately, everything but the per-module settings (see below)
+    # can be in any order - they're accessed as a dictionary so it shouldn't matter.
     pipeline_dict = {
         COOKIE_PREFIX: COOKIE_SUFFIX,
         H_HEADER: {
@@ -72,20 +76,22 @@ def save_yaml(modules, filename, file_list, modules_to_save=None, volumetric=Fal
         if modules_to_save is not None and module.module_num not in modules_to_save:
             continue
 
-        # Private module attributes should be at the end
-        module_dict = {setting.text: setting.unicode_value for setting in module.settings()}
+        module_info = {
+            # Not only is cellprofiler expecting some of these settings to be in
+            # the same order, but some of the settings can be repeated multiple times.
+            # Essentially, we can't use a dictionary here, so we have to use a list of
+            # dictionaries. See below for further explanation.
+            M_SETTINGS: [{setting.text: setting.unicode_value} for setting in module.settings()],
 
-        module_dict.update({
-            M_PRIVATE_ATTRIBUTES: {
-                attribute: getattr(module, attribute) for attribute in attributes
-            }
-        })
+            # Private module attributes should be at the end
+            M_PRIVATE_ATTRIBUTES: {attribute: getattr(module, attribute) for attribute in attributes}
+        }
 
-        # Note: it may seem wierd that we're adding dictionaries with a single key to
+        # Note: it may seem weird that we're adding dictionaries with a single key to
         # a list. If our modules list was actually a dictionary, users wouldn't be able
         # to add more than one instance of a module to the pipeline file, since they key
         # is the module name and that key has to be unique.
-        pipeline_dict[H_MODULE_LIST].append({module.module_name: module_dict})
+        pipeline_dict[H_MODULE_LIST].append({module.module_name: module_info})
 
     with codecs.open(filename, "w", 'utf-8') as out_file:
         # Use safe_dump here because we don't want yaml putting in all these
@@ -168,14 +174,22 @@ def load_yaml(fd_or_filename, raise_on_error=False, notify_fn=lambda x: None):
                 from cellprofiler.modules import instantiate_module
                 module = instantiate_module(module_name)
 
-                # Pop here because we don't want them added to the settings below
-                private_attrs = module_info.pop(M_PRIVATE_ATTRIBUTES)
+                # Extract the private attributes
+                # This is just a dictionary
+                private_attrs = module_info[M_PRIVATE_ATTRIBUTES]
 
                 for attr_name, attr_value in private_attrs.items():
                     setattr(module, attr_name, attr_value)
 
+                # Extract the settings
+                # This is a list of dictionaries (to preserve order and counter uniqueness)
+                # We need to decompose this to re-hydrate the module settings
+                # E.g. [{'a': 1}, {'b': 2}, {'a': 4}] --> [1, 2, 4]
+                module_settings = module_info[M_SETTINGS]
+                module_settings = [value for setting in module_settings for value in setting.values()]
+
                 # Set the module specific attributes
-                module.set_settings_from_values(module_info.values(),
+                module.set_settings_from_values(module_settings,
                                                 private_attrs[M_VARIABLE_REVISION],
                                                 module_name,
                                                 from_matlab=False)
