@@ -184,8 +184,7 @@ def load_yaml(filename, raise_on_error=False):
                 # Set the module specific attributes
                 module.set_settings_from_values(module_settings,
                                                 private_attrs[M_VARIABLE_REVISION],
-                                                module_name,
-                                                from_matlab=False)
+                                                module_name)
 
                 # Finally, append and increment the module version number
                 new_modules.append(module)

@@ -156,7 +156,7 @@ class Module(object):
         pass
 
     def set_settings_from_values(self, setting_values, variable_revision_number,
-                                 module_name, from_matlab=None):
+                                 module_name, from_matlab=False):
         """Set the settings in a module, given a list of values
 
         The default implementation gets all the settings and then
@@ -165,8 +165,6 @@ class Module(object):
         whatever values are in the list or however many values
         are in the list.
         """
-        if from_matlab is None:
-            from_matlab = not '.' in module_name
         setting_values, variable_revision_number, from_matlab = \
             self.upgrade_settings(setting_values,
                                   variable_revision_number,
