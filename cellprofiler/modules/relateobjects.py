@@ -1,9 +1,12 @@
 # coding=utf-8
 
 import re
+import textwrap
+
 import numpy
 import scipy.ndimage
 import skimage.segmentation
+
 import cellprofiler.measurement
 import cellprofiler.module
 import cellprofiler.setting
@@ -61,9 +64,9 @@ Measurements made by this module
 -  *Parent:* The label number of the parent object, as assigned by an
    **Identify** or **Watershed** module.
 -  *Distances:* The distance of each child object to its respective parent.
-""".format(**{
-    "HELP_ON_SAVING_OBJECTS": _help.HELP_ON_SAVING_OBJECTS
-})
+""".format(
+    HELP_ON_SAVING_OBJECTS=_help.HELP_ON_SAVING_OBJECTS
+)
 
 D_NONE = "None"
 D_CENTROID = "Centroid"
@@ -76,23 +79,24 @@ C_MEAN = "Mean"
 
 FF_MEAN = '%s_%%s_%%s' % C_MEAN
 
-'''Distance category'''
+"""Distance category"""
 C_DISTANCE = 'Distance'
 
-'''Centroid distance feature'''
+"""Centroid distance feature"""
 FEAT_CENTROID = 'Centroid'
 
-'''Minimum distance feature'''
+"""Minimum distance feature"""
 FEAT_MINIMUM = 'Minimum'
 
-'''Centroid distance measurement (FF_DISTANCE % parent)'''
+"""Centroid distance measurement (FF_DISTANCE % parent)"""
 FF_CENTROID = '%s_%s_%%s' % (C_DISTANCE, FEAT_CENTROID)
 
-'''Minimum distance measurement (FF_MINIMUM % parent)'''
+"""Minimum distance measurement (FF_MINIMUM % parent)"""
 FF_MINIMUM = '%s_%s_%%s' % (C_DISTANCE, FEAT_MINIMUM)
 
 FIXED_SETTING_COUNT = 5
 VARIABLE_SETTING_COUNT = 1
+
 
 class RelateObjects(cellprofiler.module.ObjectProcessing):
     module_name = "RelateObjects"
@@ -104,61 +108,63 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
 
         self.x_name.text = "Parent objects"
 
-        self.x_name.doc = """\
-Parent objects are defined as those objects which encompass the child object.
-For example, when relating speckles to the nuclei that contain them,
-the nuclei are the parents.
-        """
+        self.x_name.doc = textwrap.dedent("""\
+            Parent objects are defined as those objects which encompass the child object.
+            For example, when relating speckles to the nuclei that contain them,
+            the nuclei are the parents.
+        """)
 
         self.x_child_name = cellprofiler.setting.ObjectNameSubscriber(
-            "Child objects",
-            doc="""\
-Child objects are defined as those objects contained within the parent object. For example, when relating
-speckles to the nuclei that contains them, the speckles are the children.
-            """
+            text="Child objects",
+            doc=textwrap.dedent("""\
+                Child objects are defined as those objects contained within the parent object. For example,
+                when relating speckles to the nuclei that contains them, the speckles are the children.
+            """)
         )
 
         self.find_parent_child_distances = cellprofiler.setting.Choice(
-            "Calculate child-parent distances?",
-            D_ALL,
-            doc="""\
-Choose the method to calculate distances of each child to its parent.
-For example, these measurements can tell you whether nuclear speckles
-are located more closely to the center of the nucleus or to the nuclear
-periphery.
+            text="Calculate child-parent distances?",
+            choices=D_ALL,
+            doc=textwrap.dedent("""\
+                Choose the method to calculate distances of each child to its parent.
+                For example, these measurements can tell you whether nuclear speckles
+                are located more closely to the center of the nucleus or to the nuclear
+                periphery.
 
--  *{D_NONE}:* Do not calculate any distances. This saves computation time.
--  *{D_MINIMUM}:* The distance from the centroid of the child object to
-   the closest perimeter point on the parent object.
--  *{D_CENTROID}:* The distance from the centroid of the child object
-   to the centroid of the parent.
--  *{D_BOTH}:* Calculate both the *{D_MINIMUM}* and *{D_CENTROID}*
-   distances.""".format(**{
-                "D_NONE": D_NONE,
-                "D_MINIMUM": D_MINIMUM,
-                "D_CENTROID": D_CENTROID,
-                "D_BOTH": D_BOTH
-            })
+                -  *{D_NONE}:* Do not calculate any distances. This saves computation time.
+                -  *{D_MINIMUM}:* The distance from the centroid of the child object to
+                   the closest perimeter point on the parent object.
+                -  *{D_CENTROID}:* The distance from the centroid of the child object
+                   to the centroid of the parent.
+                -  *{D_BOTH}:* Calculate both the *{D_MINIMUM}* and *{D_CENTROID}*
+                   distances.
+                """.format(
+                D_NONE=D_NONE,
+                D_MINIMUM=D_MINIMUM,
+                D_CENTROID=D_CENTROID,
+                D_BOTH=D_BOTH
+            ))
         )
 
         self.wants_step_parent_distances = cellprofiler.setting.Binary(
-            "Calculate distances to other parents?",
-            False,
-            doc="""\
-*(Used only if calculating distances)*
+            text="Calculate distances to other parents?",
+            value=False,
+            doc=textwrap.dedent("""\
+                *(Used only if calculating distances)*
 
-Select "*{YES}*" to calculate the distances of the child objects to some
-other objects. These objects must be either parents or children of your
-parent object in order for this module to determine the distances. For
-instance, you might find “Nuclei” using **IdentifyPrimaryObjects**, find
-“Cells” using **IdentifySecondaryObjects** and find “Cytoplasm” using
-**IdentifyTertiaryObjects**. You can use **Relate** to relate speckles
-to cells and then measure distances to nuclei and cytoplasm. You could
-not use **RelateObjects** to relate speckles to cytoplasm and then
-measure distances to nuclei, because nuclei are neither a direct parent
-nor child of cytoplasm.""".format(**{
-                "YES": cellprofiler.setting.YES
-            })
+                Select "*{YES}*" to calculate the distances of the child objects to some
+                other objects. These objects must be either parents or children of your
+                parent object in order for this module to determine the distances. For
+                instance, you might find “Nuclei” using **IdentifyPrimaryObjects**, find
+                “Cells” using **IdentifySecondaryObjects** and find “Cytoplasm” using
+                **IdentifyTertiaryObjects**. You can use **Relate** to relate speckles
+                to cells and then measure distances to nuclei and cytoplasm. You could
+                not use **RelateObjects** to relate speckles to cytoplasm and then
+                measure distances to nuclei, because nuclei are neither a direct parent
+                nor child of cytoplasm.
+                """.format(
+                YES=cellprofiler.setting.YES
+            ))
         )
 
         self.step_parent_names = []
@@ -172,17 +178,17 @@ nor child of cytoplasm.""".format(**{
         )
 
         self.wants_per_parent_means = cellprofiler.setting.Binary(
-            "Calculate per-parent means for all child measurements?",
-            False,
-            doc="""\
-Select "*{YES}*" to calculate the per-parent mean values of every upstream
-measurement made with the children objects and store them as a
-measurement for the parent; the nomenclature of this new measurement is
-“Mean_<child>_<category>_<feature>”. This module
-must be placed *after* all **Measure** modules that make measurements
-of the children objects.""".format(**{
-                "YES": cellprofiler.setting.YES
-            })
+            text="Calculate per-parent means for all child measurements?",
+            value=False,
+            doc=textwrap.dedent("""\
+                Select "*{YES}*" to calculate the per-parent mean values of every upstream
+                measurement made with the children objects and store them as a
+                measurement for the parent; the nomenclature of this new measurement is
+                “Mean_<child>_<category>_<feature>”. This module
+                must be placed *after* all **Measure** modules that make measurements
+                of the children objects.""".format(
+                YES=cellprofiler.setting.YES
+            ))
         )
 
     def add_step_parent(self, can_delete=True):
@@ -194,13 +200,13 @@ of the children objects.""".format(**{
                 "Parent name",
                 [cellprofiler.setting.NONE],
                 choices_fn=self.get_step_parents,
-                doc="""\
-*(Used only if calculating distances to another parent)*
+                doc=textwrap.dedent("""\
+                    *(Used only if calculating distances to another parent)*
 
-Choose the name of the other parent. The **RelateObjects** module will
-measure the distance from this parent to the child objects in the same
-manner as it does to the primary parents. You can only choose the
-parents or children of the parent object."""
+                    Choose the name of the other parent. The **RelateObjects** module will
+                    measure the distance from this parent to the child objects in the same
+                    manner as it does to the primary parents. You can only choose the
+                    parents or children of the parent object.""")
             )
         )
 
@@ -217,7 +223,7 @@ parents or children of the parent object."""
         self.step_parent_names.append(group)
 
     def get_step_parents(self, pipeline):
-        '''Return the possible step-parents associated with the parent'''
+        """Return the possible step-parents associated with the parent"""
         step_parents = set()
 
         parent_name = self.x_name.value
@@ -259,7 +265,7 @@ parents or children of the parent object."""
 
     @property
     def has_step_parents(self):
-        '''True if there are possible step-parents for the parent object'''
+        """True if there are possible step-parents for the parent object"""
         return (len(self.step_parent_names) > 0 and len(self.step_parent_names[0].step_parent_name.choices) > 0)
 
     def settings(self):
@@ -481,7 +487,7 @@ parents or children of the parent object."""
         return parent_names
 
     def calculate_centroid_distances(self, workspace, parent_name):
-        '''Calculate the centroid-centroid distance between parent & child'''
+        """Calculate the centroid-centroid distance between parent & child"""
         meas = workspace.measurements
 
         sub_object_name = self.x_child_name.value
@@ -513,7 +519,7 @@ parents or children of the parent object."""
         meas.add_measurement(sub_object_name, FF_CENTROID % parent_name, dist)
 
     def calculate_minimum_distances(self, workspace, parent_name):
-        '''Calculate the distance from child center to parent perimeter'''
+        """Calculate the distance from child center to parent perimeter"""
         meas = workspace.measurements
 
         sub_object_name = self.x_child_name.value
@@ -600,7 +606,7 @@ parents or children of the parent object."""
         meas.add_measurement(sub_object_name, FF_MINIMUM % parent_name, dist)
 
     def get_parents_of(self, workspace, parent_name):
-        '''Return the parents_of measurement or equivalent
+        """Return the parents_of measurement or equivalent
 
         parent_name - name of parent objects
 
@@ -608,7 +614,7 @@ parents or children of the parent object."""
         the Parent measurement. Look for a direct parent / child link first
         and then look for relationships between self.parent_name and the
         named parent.
-        '''
+        """
         meas = workspace.measurements
 
         parent_feature = cellprofiler.measurement.FF_PARENT % parent_name
@@ -665,10 +671,10 @@ parents or children of the parent object."""
     ignore_features = set(cellprofiler.measurement.M_NUMBER_OBJECT_NUMBER)
 
     def should_aggregate_feature(self, feature_name):
-        '''Return True if aggregate measurements should be made on a feature
+        """Return True if aggregate measurements should be made on a feature
 
         feature_name - name of a measurement, such as Location_Center_X
-        '''
+        """
         if feature_name.startswith(C_MEAN):
             return False
 
@@ -681,10 +687,10 @@ parents or children of the parent object."""
         return True
 
     def validate_module(self, pipeline):
-        '''Validate the module's settings
+        """Validate the module's settings
 
         Relate will complain if the children and parents are related
-        by a prior module or if a step-parent is named twice'''
+        by a prior module or if a step-parent is named twice"""
         for module in pipeline.modules():
             if module == self:
                 break
@@ -742,7 +748,7 @@ parents or children of the parent object."""
         return columns
 
     def get_measurement_columns(self, pipeline):
-        '''Return the column definitions for this module's measurements'''
+        """Return the column definitions for this module's measurements"""
         columns = [
             (
                 self.x_child_name.value,
@@ -764,15 +770,15 @@ parents or children of the parent object."""
                     self.x_name.value,
                     FF_MEAN % (self.x_child_name.value, column[1]),
                     cellprofiler.measurement.COLTYPE_FLOAT
-                 ) for column in child_columns
-                ]
+                ) for column in child_columns
+            ]
 
         columns += self.get_child_measurement_columns(pipeline)
 
         return columns
 
     def get_object_relationships(self, pipeline):
-        '''Return the object relationships produced by this module'''
+        """Return the object relationships produced by this module"""
         parent_name = self.x_name.value
 
         sub_object_name = self.x_child_name.value
