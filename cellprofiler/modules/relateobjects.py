@@ -101,7 +101,7 @@ VARIABLE_SETTING_COUNT = 1
 class RelateObjects(cellprofiler.module.ObjectProcessing):
     module_name = "RelateObjects"
 
-    variable_revision_number = 4
+    variable_revision_number = 5
 
     def create_settings(self):
         super(RelateObjects, self).create_settings()
@@ -114,12 +114,28 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
             the nuclei are the parents.
         """)
 
-        self.x_child_name = cellprofiler.setting.ObjectNameSubscriber(
+        self.y_name = cellprofiler.setting.ObjectNameSubscriber(
             text="Child objects",
             doc=textwrap.dedent("""\
                 Child objects are defined as those objects contained within the parent object. For example,
                 when relating speckles to the nuclei that contains them, the speckles are the children.
             """)
+        )
+
+        self.wants_child_objects = cellprofiler.setting.Binary(
+            text="Save related child objects",
+            value=False,
+            doc=textwrap.dedent("""\
+                Optionally save the related objects for use in the pipeline downstream.   
+                
+                If only measurements are being made, saving the outputs is not needed.
+            """)
+        )
+
+        self.child_objects = cellprofiler.setting.ObjectNameProvider(
+            text="Name the output object",
+            value=self.__class__.__name__,
+            doc="Enter the name you want to call the object produced by this module."
         )
 
         self.find_parent_child_distances = cellprofiler.setting.Choice(
@@ -271,14 +287,22 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
     def settings(self):
         __settings__ = super(RelateObjects, self).settings()
 
-        # Because we're subscribing to multiple objects and we still want to have a provider,
-        # we insert the child subscriber before the output provider
-        __settings__.insert(1, self.x_child_name)
-
+        # The default behavior of `super().settings()` is to add x_name and y_name to the list of
+        # settings. Previously, y_name (an ObjectNameProvider) was overridden by an ObjectNameSubscriber.
+        # This cleverly added the "child objects" selection to the settings above, so it didn't need to be
+        # explicitly added.
+        # In commit https://github.com/CellProfiler/CellProfiler/commit/4455a0699cfad72e9f80b5e74cf3b73d0652f7b4,
+        # I actually allowed y_name to be the default ObjectNameSubscriber, and then inserted x_child_name
+        # (the ObjectNameProvider previously y_name) intentionally above the two object subscribers.
+        # Unfortunately, this broke some pipelines in case anyone had more than one RelateObjects module in
+        # a pipeline, so I'm reverting this back to it's default, "clever" behavior, and optionally add an
+        # object provider in case people want to save the objects.
         __settings__ += [
             self.find_parent_child_distances,
             self.wants_per_parent_means,
-            self.wants_step_parent_distances
+            self.wants_step_parent_distances,
+            self.wants_child_objects,
+            self.child_objects
         ]
 
         __settings__ += [group.step_parent_name for group in self.step_parent_names]
@@ -289,8 +313,15 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
 
         __settings__ = super(RelateObjects, self).visible_settings()
 
-        # See settings for insert rationale
-        __settings__.insert(1, self.x_child_name)
+        __settings__ += [
+            self.wants_child_objects
+        ]
+
+        # If the user wants to save the objects, show the ObjectNameProvider
+        if self.wants_child_objects.value:
+            __settings__ += [
+                self.child_objects
+            ]
 
         __settings__ += [
             self.wants_per_parent_means,
@@ -313,21 +344,21 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
 
         parents = objects.get_objects(self.x_name.value)
 
-        children = objects.get_objects(self.x_child_name.value)
+        children = objects.get_objects(self.y_name.value)
 
         child_count, parents_of = parents.relate_children(children)
 
         m = workspace.measurements
 
         m.add_measurement(
-            self.x_child_name.value,
+            self.y_name.value,
             cellprofiler.measurement.FF_PARENT % self.x_name.value,
             parents_of
         )
 
         m.add_measurement(
             self.x_name.value,
-            cellprofiler.measurement.FF_CHILDREN_COUNT % self.x_child_name.value,
+            cellprofiler.measurement.FF_CHILDREN_COUNT % self.y_name.value,
             child_count
         )
 
@@ -342,7 +373,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
                 self.module_num,
                 cellprofiler.measurement.R_PARENT,
                 self.x_name.value,
-                self.x_child_name.value,
+                self.y_name.value,
                 image_numbers,
                 good_parents,
                 image_numbers,
@@ -352,7 +383,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
             m.add_relate_measurement(
                 self.module_num,
                 cellprofiler.measurement.R_CHILD,
-                self.x_child_name.value,
+                self.y_name.value,
                 self.x_name.value,
                 image_numbers,
                 good_children,
@@ -372,11 +403,11 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
         if self.wants_per_parent_means.value:
             parent_indexes = numpy.arange(numpy.max(parents.segmented)) + 1
 
-            for feature_name in m.get_feature_names(self.x_child_name.value):
+            for feature_name in m.get_feature_names(self.y_name.value):
                 if not self.should_aggregate_feature(feature_name):
                     continue
 
-                data = m.get_current_measurement(self.x_child_name.value, feature_name)
+                data = m.get_current_measurement(self.y_name.value, feature_name)
 
                 if data is not None and len(data) > 0:
                     if len(parents_of) > 0:
@@ -387,7 +418,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
                     # No child measurements - all NaN
                     means = numpy.ones(len(parents_of)) * numpy.nan
 
-                mean_feature_name = FF_MEAN % (self.x_child_name.value, feature_name)
+                mean_feature_name = FF_MEAN % (self.y_name.value, feature_name)
 
                 m.add_measurement(self.x_name.value, mean_feature_name, means)
 
@@ -406,15 +437,17 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
 
         parent_labeled_children[mask] = mapping[parents_of[child_labels[mask] - 1]]
 
-        y_name = self.y_name.value
+        if self.wants_child_objects.value:
 
-        y = cellprofiler.object.Objects()
+            child_name = self.child_objects.value
 
-        y.segmented = parent_labeled_children
+            child = cellprofiler.object.Objects()
 
-        y.parent_image = children.parent_image
+            child.segmented = parent_labeled_children
 
-        objects.add_objects(y, y_name)
+            child.parent_image = children.parent_image
+
+            objects.add_objects(child, child_name)
 
         if self.show_window:
             workspace.display_data.parent_labels = parents.segmented
@@ -462,7 +495,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
             1,
             0,
             child_labels,
-            title=self.x_child_name.value,
+            title=self.y_name.value,
             sharexy=figure.subplot(0, 0),
             # max_label=max_label,
             # seed=seed
@@ -472,7 +505,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
             0,
             1,
             related_children,
-            title="{} labeled by {}".format(self.x_child_name.value, self.x_name.value),
+            title="{} labeled by {}".format(self.y_name.value, self.x_name.value),
             sharexy=figure.subplot(0, 0),
             # max_label=max_label,
             # seed=seed
@@ -490,7 +523,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
         """Calculate the centroid-centroid distance between parent & child"""
         meas = workspace.measurements
 
-        sub_object_name = self.x_child_name.value
+        sub_object_name = self.y_name.value
 
         parents = workspace.object_set.get_objects(parent_name)
 
@@ -522,7 +555,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
         """Calculate the distance from child center to parent perimeter"""
         meas = workspace.measurements
 
-        sub_object_name = self.x_child_name.value
+        sub_object_name = self.y_name.value
 
         parents = workspace.object_set.get_objects(parent_name)
 
@@ -621,7 +654,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
 
         primary_parent = self.x_name.value
 
-        sub_object_name = self.x_child_name.value
+        sub_object_name = self.y_name.value
 
         primary_parent_feature = cellprofiler.measurement.FF_PARENT % primary_parent
 
@@ -695,12 +728,12 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
             if module == self:
                 break
 
-            parent_features = module.get_measurements(pipeline, self.x_child_name.value, "Parent")
+            parent_features = module.get_measurements(pipeline, self.y_name.value, "Parent")
 
             if self.x_name.value in parent_features:
                 raise cellprofiler.setting.ValidationError(
                     "{} and {} were related by the {} module".format(
-                        self.x_child_name.value,
+                        self.y_name.value,
                         self.x_name.value,
                         module.module_name
                     ),
@@ -722,7 +755,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
 
     def get_child_columns(self, pipeline):
         child_columns = list(filter(
-            lambda column: column[0] == self.x_child_name.value and self.should_aggregate_feature(column[1]),
+            lambda column: column[0] == self.y_name.value and self.should_aggregate_feature(column[1]),
             pipeline.get_measurement_columns(self)
 
         ))
@@ -736,13 +769,13 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
         if self.find_parent_child_distances in (D_BOTH, D_CENTROID):
             for parent_name in self.get_parent_names():
                 columns += [
-                    (self.x_child_name.value, FF_CENTROID % parent_name, cellprofiler.measurement.COLTYPE_INTEGER)
+                    (self.y_name.value, FF_CENTROID % parent_name, cellprofiler.measurement.COLTYPE_INTEGER)
                 ]
 
         if self.find_parent_child_distances in (D_BOTH, D_MINIMUM):
             for parent_name in self.get_parent_names():
                 columns += [
-                    (self.x_child_name.value, FF_MINIMUM % parent_name, cellprofiler.measurement.COLTYPE_INTEGER)
+                    (self.y_name.value, FF_MINIMUM % parent_name, cellprofiler.measurement.COLTYPE_INTEGER)
                 ]
 
         return columns
@@ -751,13 +784,13 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
         """Return the column definitions for this module's measurements"""
         columns = [
             (
-                self.x_child_name.value,
+                self.y_name.value,
                 cellprofiler.measurement.FF_PARENT % self.x_name.value,
                 cellprofiler.measurement.COLTYPE_INTEGER
             ),
             (
                 self.x_name.value,
-                cellprofiler.measurement.FF_CHILDREN_COUNT % self.x_child_name.value,
+                cellprofiler.measurement.FF_CHILDREN_COUNT % self.y_name.value,
                 cellprofiler.measurement.COLTYPE_INTEGER
             )
         ]
@@ -768,7 +801,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
             columns += [
                 (
                     self.x_name.value,
-                    FF_MEAN % (self.x_child_name.value, column[1]),
+                    FF_MEAN % (self.y_name.value, column[1]),
                     cellprofiler.measurement.COLTYPE_FLOAT
                 ) for column in child_columns
             ]
@@ -781,7 +814,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
         """Return the object relationships produced by this module"""
         parent_name = self.x_name.value
 
-        sub_object_name = self.x_child_name.value
+        sub_object_name = self.y_name.value
 
         return [
             (
@@ -802,12 +835,12 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
         if object_name == self.x_name.value:
             if self.wants_per_parent_means:
                 return [
-                    "Mean_{}".format(self.x_child_name),
+                    "Mean_{}".format(self.y_name),
                     "Children"
                 ]
             else:
                 return ["Children"]
-        elif object_name == self.x_child_name.value:
+        elif object_name == self.y_name.value:
             result = ["Parent"]
 
             if self.find_parent_child_distances != D_NONE:
@@ -819,7 +852,7 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
 
     def get_measurements(self, pipeline, object_name, category):
         if object_name == self.x_name.value:
-            if category == u"Mean_{}".format(self.x_child_name.value):
+            if category == u"Mean_{}".format(self.y_name.value):
                 measurements = []
 
                 child_columns = self.get_child_columns(pipeline)
@@ -828,10 +861,10 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
 
                 return measurements
             elif category == "Children":
-                return [u"{}_Count".format(self.x_child_name.value)]
-        elif object_name == self.x_child_name.value and category == "Parent":
+                return [u"{}_Count".format(self.y_name.value)]
+        elif object_name == self.y_name.value and category == "Parent":
             return [self.x_name.value]
-        elif (object_name == self.x_child_name.value and category == C_DISTANCE):
+        elif (object_name == self.y_name.value and category == C_DISTANCE):
             result = []
 
             if self.find_parent_child_distances in (D_BOTH, D_CENTROID):
@@ -887,9 +920,23 @@ class RelateObjects(cellprofiler.module.ObjectProcessing):
 
         if variable_revision_number == 3:
             # Added an output provider after the parent/child selection
-            setting_values.insert(2, module_name)
+            # Revised once more to not add the output provider as default
+            # Add the "wants_child_objects" value and default subscriber name
+            setting_values.insert(5, False)
+            setting_values.insert(6, module_name)
 
-            variable_revision_number = 4
+            # Skip straight to version 5, as version 4 was a dud
+            variable_revision_number = 5
+
+        if variable_revision_number == 4:
+            # Removed the output provider by default
+            # If a pipeline doesn't have the default subscriber name (e.g. RelateObjects),
+            # then assume that they did actually want output objects.
+            # Move the name provider to the end of the list
+            name_provider = setting_values.pop(2)
+            wants_output_objects = False if name_provider == module_name else True
+            setting_values.insert(5, wants_output_objects)
+            setting_values.insert(6, name_provider)
 
         return setting_values, variable_revision_number, from_matlab
 
