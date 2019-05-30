@@ -1,8 +1,16 @@
 version: 2
- jobs:
-   build:
-     docker:
-       - image: circleci/python:2.7
-     steps:
-       - checkout
-       - run: echo "A first hello"
+jobs:
+  macos-build-and-test:
+    macos:
+      xcode: "9.0"
+    steps:
+      - checkout
+      - run: brew cask install java
+      - run: brew install mysql python upx wxpython
+      - run: git clone git://github.com/CellProfiler/distribution
+      - run: cd distribution/macos && make
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - macos-build-and-test
