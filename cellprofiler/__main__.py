@@ -790,7 +790,7 @@ def run_pipeline_headless(options, args):
 
         pipeline_text = pipeline_text
 
-        pipeline.load(six.moves.StringIO(pipeline_text))
+        pipeline.load(six.moves.StringIO(pipeline_text.decode('unicode_escape')))
 
         if not pipeline.in_batch_mode():
             #

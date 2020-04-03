@@ -1976,9 +1976,10 @@ def load_measurements(
 
     returns a Measurements object
     """
-    HDF5_HEADER = (
-        chr(137) + chr(72) + chr(68) + chr(70) + chr(13) + chr(10) + chr(26) + chr(10)
-    )
+    # HDF5_HEADER = (
+    #     chr(137) + chr(72) + chr(68) + chr(70) + chr(13) + chr(10) + chr(26) + chr(10)
+    # )
+    HDF5_HEADER = b'\x89HDF\r\n\x1a\n'
     if hasattr(filename, "seek"):
         filename.seek(0)
         header = filename.read(len(HDF5_HEADER))

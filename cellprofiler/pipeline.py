@@ -201,9 +201,11 @@ SAD_PROOFPOINT_COOKIE = r"CellProfiler Pipeline: https?://\S+.proofpoint.com.+ht
 
 see http://www.hdfgroup.org/HDF5/doc/H5.format.html#FileMetaData
 """
-HDF5_HEADER = (
-    chr(137) + chr(72) + chr(68) + chr(70) + chr(13) + chr(10) + chr(26) + chr(10)
-)
+# HDF5_HEADER = (
+#     chr(137) + chr(72) + chr(68) + chr(70) + chr(13) + chr(10) + chr(26) + chr(10)
+# )
+HDF5_HEADER = b'\x89HDF\r\n\x1a\n'
+
 C_PIPELINE = "Pipeline"
 C_CELLPROFILER = "CellProfiler"
 F_PIPELINE = "Pipeline"
@@ -1134,9 +1136,9 @@ class Pipeline(object):
                         break
                     if len(line.strip()) == 0:
                         break
-                    if len(line.split(":")) != 2:
+                    if len(line.split(":", 1)) != 2:
                         raise ValueError("Invalid format for setting: %s" % line)
-                    text, setting = line.split(":")
+                    text, setting = line.split(":", 1)
 
                     # TODO: remove en/decode when example cppipe no longer has \x__ characters
                     # En/decode needed to read example cppipe format
